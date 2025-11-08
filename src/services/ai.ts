@@ -1,12 +1,52 @@
 import type { ChannelDashboard, VideoCore, KeywordSummary, BlueOceanMetrics } from '../types';
+import { createOpenAIService } from './openai';
+import prompts from '../src/prompts/index';
 
 // AI service for generating insights and strategies
-// Note: In production, this should call a backend AI service with proper API keys
+// Supports both real GPT (with API key) and simulated responses (fallback)
 
 export class AIService {
+  private openaiService: any;
+
+  constructor(openaiApiKey?: string) {
+    if (openaiApiKey) {
+      try {
+        this.openaiService = createOpenAIService(openaiApiKey);
+      } catch (error) {
+        console.error('OpenAI 초기화 실패:', error);
+        this.openaiService = null;
+      }
+    }
+  }
+
   // Generate competition strategy report
-  async generateCompetitionStrategy(dashboard: ChannelDashboard): Promise<string> {
-    // Simulated AI response - replace with actual AI API call
+  async generateCompetitionStrategy(
+    dashboard: ChannelDashboard, 
+    useAI: boolean = false
+  ): Promise<string> {
+    // AI 모드: OpenAI GPT 사용
+    if (useAI && this.openaiService) {
+      const systemPrompt = `당신은 10년 경력의 YouTube 채널 성장 전문가입니다. 
+데이터 기반으로 구체적이고 실행 가능한 전략을 제시하세요.
+모든 제안은 제공된 데이터를 반드시 인용해야 합니다.
+추측이나 일반론은 피하고, 이 채널만의 맞춤 전략을 제시하세요.`;
+
+      const userPrompt = prompts.competition(dashboard);
+
+      try {
+        const response = await this.openaiService.generate(
+          systemPrompt,
+          userPrompt,
+          { temperature: 0.7, maxTokens: 2000 }
+        );
+        return response;
+      } catch (error: any) {
+        console.error('AI 분석 실패:', error);
+        throw new Error(`AI 분석 실패: ${error.message}`);
+      }
+    }
+
+    // 시뮬레이션 모드: 기본 템플릿 응답
     const { core, videos, metrics } = dashboard;
     
     const topVideos = videos
@@ -62,7 +102,27 @@ ${metrics.shortsRatio > 0.5 ? '쇼츠 중심' : '롱폼 중심'} 접근 방식�
   }
 
   // Generate growth phases analysis
-  async generateGrowthPhases(dashboard: ChannelDashboard): Promise<string> {
+  async generateGrowthPhases(
+    dashboard: ChannelDashboard,
+    useAI: boolean = false
+  ): Promise<string> {
+    // AI 모드
+    if (useAI && this.openaiService) {
+      const systemPrompt = `당신은 데이터 분석가입니다. 
+채널의 성장 패턴을 분석하고 향후 예측을 제공하세요.
+구체적인 숫자와 증거를 바탕으로 설명하세요.`;
+
+      const userPrompt = prompts.growth(dashboard);
+
+      try {
+        return await this.openaiService.generate(systemPrompt, userPrompt);
+      } catch (error: any) {
+        console.error('AI 성장 분석 실패:', error);
+        throw new Error(`AI 성장 분석 실패: ${error.message}`);
+      }
+    }
+
+    // 시뮬레이션 모드
     const { core, videos } = dashboard;
     
     // Sort by publish date
@@ -109,7 +169,27 @@ ${avgViews(recent) > avgViews(mid) ? '✓ 지속적인 성장 궤도' : '• 정
   }
 
   // Generate channel diagnosis
-  async generateDiagnosis(dashboard: ChannelDashboard): Promise<string> {
+  async generateDiagnosis(
+    dashboard: ChannelDashboard,
+    useAI: boolean = false
+  ): Promise<string> {
+    // AI 모드
+    if (useAI && this.openaiService) {
+      const systemPrompt = `당신은 YouTube 컨설턴트입니다. 
+채널의 강점과 약점을 진단하고 개선 방안을 제시하세요.
+단기와 장기 실행 계획을 구체적으로 작성하세요.`;
+
+      const userPrompt = prompts.diagnosis(dashboard);
+
+      try {
+        return await this.openaiService.generate(systemPrompt, userPrompt);
+      } catch (error: any) {
+        console.error('AI 진단 실패:', error);
+        throw new Error(`AI 진단 실패: ${error.message}`);
+      }
+    }
+
+    // 시뮬레이션 모드
     const { core, videos, metrics } = dashboard;
     
     const avgEngagement = videos.reduce((sum, v) => {
@@ -156,7 +236,27 @@ ${avgViews(recent) > avgViews(mid) ? '✓ 지속적인 성장 궤도' : '• 정
   }
 
   // Generate keyword strategy
-  async generateKeywordStrategy(summary: KeywordSummary): Promise<string> {
+  async generateKeywordStrategy(
+    summary: KeywordSummary,
+    useAI: boolean = false
+  ): Promise<string> {
+    // AI 모드
+    if (useAI && this.openaiService) {
+      const systemPrompt = `당신은 YouTube SEO 전문가입니다. 
+키워드 데이터를 분석하여 콘텐츠 전략을 제안하세요.
+제목 템플릿, 썸네일 콘셉트, 주간 캘린더를 포함하세요.`;
+
+      const userPrompt = prompts.keyword(summary);
+
+      try {
+        return await this.openaiService.generate(systemPrompt, userPrompt);
+      } catch (error: any) {
+        console.error('AI 키워드 전략 실패:', error);
+        throw new Error(`AI 키워드 전략 실패: ${error.message}`);
+      }
+    }
+
+    // 시뮬레이션 모드
     const { query, videos, topChannels, formatMix } = summary;
     
     const avgViews = videos.reduce((sum, v) => sum + (v.stats.views || 0), 0) / videos.length;
@@ -207,7 +307,27 @@ ${this.generateContentCalendar(query, formatMix)}
   }
 
   // Generate blue ocean analysis
-  async generateBlueOceanAnalysis(metrics: BlueOceanMetrics): Promise<string> {
+  async generateBlueOceanAnalysis(
+    metrics: BlueOceanMetrics,
+    useAI: boolean = false
+  ): Promise<string> {
+    // AI 모드
+    if (useAI && this.openaiService) {
+      const systemPrompt = `당신은 시장 분석 전문가입니다. 
+블루오션/레드오션을 판단하고 진입 전략을 제시하세요.
+데이터 기반으로 구체적인 실행 계획을 작성하세요.`;
+
+      const userPrompt = prompts.blueOcean(metrics);
+
+      try {
+        return await this.openaiService.generate(systemPrompt, userPrompt);
+      } catch (error: any) {
+        console.error('AI 블루오션 분석 실패:', error);
+        throw new Error(`AI 블루오션 분석 실패: ${error.message}`);
+      }
+    }
+
+    // 시뮬레이션 모드
     const { query, viewMean, viewMedian, concentrationRatio, activity, verdict } = metrics;
 
     return `# 블루오션 분석: \"${query}\"
@@ -368,4 +488,10 @@ ${isShort ?
   }
 }
 
+// 팩토리 함수: OpenAI 키로 AI 서비스 생성
+export function createAIService(openaiApiKey?: string): AIService {
+  return new AIService(openaiApiKey);
+}
+
+// 기본 인스턴스 (시뮬레이션 모드)
 export const aiService = new AIService();

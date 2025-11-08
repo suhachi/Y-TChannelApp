@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Download, Loader2, BarChart3, ArrowLeft } from '../src/components/icons';
+import { Download, Loader2, BarChart3, ArrowLeft, Sparkles } from '../src/components/icons';
 import { toast } from './ui/sonner';
 import { useLocation } from '../src/lib/simple-router';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
+import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Alert, AlertDescription } from './ui/alert';
 import { Skeleton } from './ui/skeleton';
 import { useApiKey } from '../hooks/useApiKey';
 import { YouTubeAPI } from '../services/youtube-api';
-import { aiService } from '../services/ai';
+import { createAIService } from '../services/ai';
 import { computeKPIs } from '../src/lib/aggregate';
 import { exportToCSV, exportToJSON } from '../src/lib/export';
 import { KpiCards } from '../src/components/channel/KpiCards';
@@ -19,11 +20,12 @@ import { VideoTable } from '../src/components/channel/VideoTable';
 import type { ChannelDashboard } from '../types';
 
 export function ChannelDetail() {
-  const { hasValidKey } = useApiKey();
+  const { hasValidKey, openaiApiKey, hasOpenAIKey } = useApiKey();
   const [location, setLocation] = useLocation();
   const [loading, setLoading] = useState(false);
   const [dashboard, setDashboard] = useState<ChannelDashboard | null>(null);
   const [aiReport, setAiReport] = useState<{ competition?: string; growth?: string; diagnosis?: string }>({});
+  const [generatingAI, setGeneratingAI] = useState<{ competition?: boolean; growth?: boolean; diagnosis?: boolean }>({});
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -131,16 +133,50 @@ export function ChannelDetail() {
 
   const generateAIReports = async (data: ChannelDashboard) => {
     try {
-      console.log('🤖 Generating AI reports...');
+      console.log('🤖 Generating AI reports (Simulation Mode)...');
+      const aiService = createAIService(openaiApiKey);
+      
       const [competition, growth, diagnosis] = await Promise.all([
-        aiService.generateCompetitionStrategy(data),
-        aiService.generateGrowthPhases(data),
-        aiService.generateDiagnosis(data),
+        aiService.generateCompetitionStrategy(data, false), // 초기 로딩은 시뮬레이션
+        aiService.generateGrowthPhases(data, false),
+        aiService.generateDiagnosis(data, false),
       ]);
       setAiReport({ competition, growth, diagnosis });
       console.log('✅ AI reports generated');
     } catch (err) {
       console.error('Failed to generate AI reports:', err);
+    }
+  };
+
+  const generateAIInsight = async (type: 'competition' | 'growth' | 'diagnosis') => {
+    if (!dashboard) return;
+    
+    setGeneratingAI({ ...generatingAI, [type]: true });
+    
+    try {
+      const aiService = createAIService(openaiApiKey);
+      const useAI = hasOpenAIKey; // OpenAI 키가 있으면 실제 GPT 사용
+      
+      let result = '';
+      switch (type) {
+        case 'competition':
+          result = await aiService.generateCompetitionStrategy(dashboard, useAI);
+          break;
+        case 'growth':
+          result = await aiService.generateGrowthPhases(dashboard, useAI);
+          break;
+        case 'diagnosis':
+          result = await aiService.generateDiagnosis(dashboard, useAI);
+          break;
+      }
+      
+      setAiReport({ ...aiReport, [type]: result });
+      toast.success(useAI ? 'GPT-4o 분석 완료!' : '분석 완료 (시뮬레이션 모드)');
+    } catch (err: any) {
+      console.error('AI insight error:', err);
+      toast.error(err.message || 'AI 분석 실패');
+    } finally {
+      setGeneratingAI({ ...generatingAI, [type]: false });
     }
   };
 
@@ -272,59 +308,133 @@ export function ChannelDetail() {
           </div>
 
           {/* AI Insights */}
-          <Card className="border-border">
+          <Card className="border-border bg-gradient-to-br from-purple-900/10 to-blue-900/10 border-purple-500/20">
             <CardHeader>
-              <CardTitle>🤖 AI 인사이트</CardTitle>
-              <CardDescription>
-                AI가 분석한 채널 전략 및 성장 제안
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-purple-400" />
+                    AI 인사이트
+                    {hasOpenAIKey && (
+                      <Badge className="bg-gradient-to-r from-purple-600 to-blue-600 text-white border-0">
+                        Powered by GPT-4o
+                      </Badge>
+                    )}
+                  </CardTitle>
+                  <CardDescription>
+                    {hasOpenAIKey 
+                      ? 'OpenAI GPT-4o가 분석한 맞춤형 채널 전략'
+                      : 'AI가 분석한 채널 전략 (시뮬레이션 모드)'}
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="competition" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-3 bg-accent">
                   <TabsTrigger value="competition">경쟁 분석</TabsTrigger>
                   <TabsTrigger value="growth">성장 전략</TabsTrigger>
                   <TabsTrigger value="diagnosis">진단</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="competition" className="mt-4">
+                <TabsContent value="competition" className="mt-4 space-y-4">
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => generateAIInsight('competition')}
+                      disabled={generatingAI.competition}
+                      size="sm"
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                    >
+                      {generatingAI.competition ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          분석 중...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          {hasOpenAIKey ? 'GPT-4o 분석' : '분석 새로고침'}
+                        </>
+                      )}
+                    </Button>
+                  </div>
                   {aiReport.competition ? (
                     <div className="prose prose-invert max-w-none">
-                      <pre className="whitespace-pre-wrap text-sm bg-accent/50 p-4 rounded-lg">
+                      <pre className="whitespace-pre-wrap text-sm bg-accent/50 p-4 rounded-lg border border-purple-500/20">
                         {aiReport.competition}
                       </pre>
                     </div>
                   ) : (
                     <div className="flex items-center justify-center h-32">
-                      <Loader2 className="w-6 h-6 animate-spin text-[#ef4444]" />
+                      <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
                     </div>
                   )}
                 </TabsContent>
 
-                <TabsContent value="growth" className="mt-4">
+                <TabsContent value="growth" className="mt-4 space-y-4">
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => generateAIInsight('growth')}
+                      disabled={generatingAI.growth}
+                      size="sm"
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                    >
+                      {generatingAI.growth ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          분석 중...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          {hasOpenAIKey ? 'GPT-4o 분석' : '분석 새로고침'}
+                        </>
+                      )}
+                    </Button>
+                  </div>
                   {aiReport.growth ? (
                     <div className="prose prose-invert max-w-none">
-                      <pre className="whitespace-pre-wrap text-sm bg-accent/50 p-4 rounded-lg">
+                      <pre className="whitespace-pre-wrap text-sm bg-accent/50 p-4 rounded-lg border border-purple-500/20">
                         {aiReport.growth}
                       </pre>
                     </div>
                   ) : (
                     <div className="flex items-center justify-center h-32">
-                      <Loader2 className="w-6 h-6 animate-spin text-[#ef4444]" />
+                      <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
                     </div>
                   )}
                 </TabsContent>
 
-                <TabsContent value="diagnosis" className="mt-4">
+                <TabsContent value="diagnosis" className="mt-4 space-y-4">
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => generateAIInsight('diagnosis')}
+                      disabled={generatingAI.diagnosis}
+                      size="sm"
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                    >
+                      {generatingAI.diagnosis ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          분석 중...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          {hasOpenAIKey ? 'GPT-4o 분석' : '분석 새로고침'}
+                        </>
+                      )}
+                    </Button>
+                  </div>
                   {aiReport.diagnosis ? (
                     <div className="prose prose-invert max-w-none">
-                      <pre className="whitespace-pre-wrap text-sm bg-accent/50 p-4 rounded-lg">
+                      <pre className="whitespace-pre-wrap text-sm bg-accent/50 p-4 rounded-lg border border-purple-500/20">
                         {aiReport.diagnosis}
                       </pre>
                     </div>
                   ) : (
                     <div className="flex items-center justify-center h-32">
-                      <Loader2 className="w-6 h-6 animate-spin text-[#ef4444]" />
+                      <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
                     </div>
                   )}
                 </TabsContent>

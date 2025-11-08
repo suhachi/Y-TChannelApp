@@ -11,9 +11,22 @@ import { ApiKeyGuide } from '../src/components/ApiKeyGuide';
 
 export function ApiKeySetup() {
   const [inputKey, setInputKey] = useState('');
+  const [inputOpenAIKey, setInputOpenAIKey] = useState('');
   const [showKey, setShowKey] = useState(false);
+  const [showOpenAIKey, setShowOpenAIKey] = useState(false);
   const [activeTab, setActiveTab] = useState('setup');
-  const { apiKey, status, error, testKey, clearKey, hasValidKey } = useApiKey();
+  const { 
+    apiKey, 
+    status, 
+    error, 
+    testKey, 
+    clearKey, 
+    hasValidKey,
+    openaiApiKey,
+    saveOpenAIKey,
+    clearOpenAIKey,
+    hasOpenAIKey
+  } = useApiKey();
 
   const handleTest = async () => {
     if (!inputKey.trim()) return;
@@ -262,6 +275,111 @@ export function ApiKeySetup() {
               </CardContent>
             </Card>
           </div>
+
+          {/* OpenAI API 키 (선택사항) */}
+          <Card className="border-border border-purple-500/30 bg-purple-500/5">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                  <span className="text-purple-400 text-sm">AI</span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <CardTitle>OpenAI API 키</CardTitle>
+                    <Badge variant="outline" className="border-purple-500/30 text-purple-400">선택사항</Badge>
+                  </div>
+                  <CardDescription>
+                    GPT-4o로 강화된 AI 인사이트 생성 (선택사항)
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert className="bg-purple-500/10 border-purple-500/30">
+                <AlertCircle className="h-4 w-4 text-purple-400" />
+                <AlertDescription className="text-sm text-purple-400">
+                  <strong className="block mb-2">🎉 AI 인사이트 기능</strong>
+                  <p className="mb-2">
+                    OpenAI API 키를 추가하면 실제 GPT-4o가 채널을 분석합니다:
+                  </p>
+                  <ul className="space-y-1 text-sm">
+                    <li>• 맞춤형 성장 전략 제안</li>
+                    <li>• 경쟁사 심층 분석</li>
+                    <li>• 콘텐츠 최적화 인사이트</li>
+                    <li>• 블루오션 기회 발견</li>
+                  </ul>
+                  <p className="mt-2 text-xs">
+                    키가 없어도 기본 분석은 가능합니다 (시뮬레이션 모드)
+                  </p>
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-3">
+                <div className="relative">
+                  <Input
+                    type={showOpenAIKey ? 'text' : 'password'}
+                    placeholder="sk-proj-..."
+                    value={inputOpenAIKey}
+                    onChange={(e) => setInputOpenAIKey(e.target.value)}
+                    className="pr-10 h-12 bg-background border-purple-500/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowOpenAIKey(!showOpenAIKey)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showOpenAIKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => {
+                      if (inputOpenAIKey.trim()) {
+                        saveOpenAIKey(inputOpenAIKey.trim());
+                      }
+                    }}
+                    disabled={!inputOpenAIKey.trim()}
+                    className="flex-1 h-11 bg-purple-600 hover:bg-purple-700"
+                  >
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    저장
+                  </Button>
+                  {hasOpenAIKey && (
+                    <Button variant="outline" onClick={clearOpenAIKey} className="h-11 border-purple-500/30">
+                      초기화
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {hasOpenAIKey && openaiApiKey && (
+                <Alert className="bg-emerald-500/10 border-emerald-500/30">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                  <AlertDescription className="text-emerald-400">
+                    OpenAI API 키가 저장되었습니다. 이제 AI 인사이트를 생성할 수 있습니다!
+                    <p className="text-sm mt-1">
+                      저장된 키: <span className="font-mono">{openaiApiKey.substring(0, 15)}...</span>
+                    </p>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-2 pt-2">
+                <p className="text-sm text-muted-foreground">
+                  📖 OpenAI API 키 발급 방법:
+                </p>
+                <ol className="space-y-1 text-sm text-muted-foreground pl-4">
+                  <li>1. <a href="https://platform.openai.com" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline">platform.openai.com</a> 접속</li>
+                  <li>2. API Keys → Create new secret key</li>
+                  <li>3. 키 복사 후 위에 입력</li>
+                </ol>
+                <p className="text-xs text-muted-foreground mt-2">
+                  💰 예상 비용: 채널 분석 1회당 약 $0.01-0.05
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="guide" className="mt-6">

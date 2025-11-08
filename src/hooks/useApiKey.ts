@@ -3,28 +3,37 @@ import { storage } from '../lib/storage';
 import { YouTubeAPI } from '../services/youtube-api';
 import type { ApiKeyStatus } from '../types';
 
+const OPENAI_KEY_STORAGE = 'openai_api_key';
+
 export function useApiKey() {
   const [apiKey, setApiKey] = useState<string | null>(null);
+  const [openaiApiKey, setOpenaiApiKey] = useState<string | null>(null);
   const [status, setStatus] = useState<ApiKeyStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadApiKey = async () => {
+    const loadApiKeys = async () => {
       try {
-        const savedKey = await storage.getApiKey();
-        if (savedKey) {
-          setApiKey(savedKey);
+        const savedYoutubeKey = await storage.getApiKey();
+        const savedOpenAIKey = localStorage.getItem(OPENAI_KEY_STORAGE);
+        
+        if (savedYoutubeKey) {
+          setApiKey(savedYoutubeKey);
           setStatus('valid');
         }
+        
+        if (savedOpenAIKey) {
+          setOpenaiApiKey(savedOpenAIKey);
+        }
       } catch (err) {
-        console.error('Failed to load API key:', err);
+        console.error('Failed to load API keys:', err);
       } finally {
         setLoading(false);
       }
     };
     
-    loadApiKey();
+    loadApiKeys();
   }, []);
 
   const testKey = async (key: string) => {
@@ -53,6 +62,16 @@ export function useApiKey() {
     }
   };
 
+  const saveOpenAIKey = (key: string) => {
+    localStorage.setItem(OPENAI_KEY_STORAGE, key);
+    setOpenaiApiKey(key);
+  };
+
+  const clearOpenAIKey = () => {
+    localStorage.removeItem(OPENAI_KEY_STORAGE);
+    setOpenaiApiKey(null);
+  };
+
   const clearKey = () => {
     storage.clearApiKey();
     setApiKey(null);
@@ -61,7 +80,13 @@ export function useApiKey() {
     setLoading(false);
   };
 
+  const clearAllKeys = () => {
+    clearKey();
+    clearOpenAIKey();
+  };
+
   return {
+    // YouTube API
     apiKey,
     status,
     error,
@@ -69,5 +94,14 @@ export function useApiKey() {
     testKey,
     clearKey,
     hasValidKey: status === 'valid' && !!apiKey,
+    
+    // OpenAI API
+    openaiApiKey,
+    saveOpenAIKey,
+    clearOpenAIKey,
+    hasOpenAIKey: !!openaiApiKey,
+    
+    // 전체
+    clearAllKeys,
   };
 }
